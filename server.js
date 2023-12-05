@@ -1,158 +1,130 @@
 const express = require("express");
-const cookieParser = require("cookie-parser");
-const path = require("path");
-
+const exphbs = require("express-handlebars");
 const app = express();
-//Define Display messages
 
-const HTTP_PORT = 8080;
-const collegeData = require("./modules/collegeData.js");
-// Adjust the path as needed.
+const HTTP_PORT = process.env.PORT || 8080;
 
-// Middleware to parse cookies
-app.use(cookieParser());
 
-// Middleware to handle a custom request property
-app.use((req, res, next) => {
-  console.log("Handling request");
-  req.fromMiddleware = "Hello From Middleware!";
-  next();
-});
 
+// Serve static files from the "public" directory
 app.use(express.static("public"));
-app.use(express.urlencoded({ extended: true }));
 
-// Define route for the root URL "/"
-app.get("/", (req, res) => {
-  // This route serves HTML from "home.html"
-  console.log(req.fromMiddleware);
-  res.sendFile(path.join(__dirname, "views/home.html"));
-});
 
-// Define route for "/about"
-app.get("/about", (req, res) => {
-  res.sendFile(path.join(__dirname, "/views/about.html"));
-});
-
-app.get("/htmlDemo", (req, res) => {
-  res.sendFile(path.join(__dirname, "/views/htmlDemo.html"));
-});
-
-app.get("/students/add", (req, res) => {
-  res.sendFile(path.join(__dirname, "/views/addStudent.html"));
-});
-
-//Route for getting all students or students for a given course.
-app.get("/students", async (req, res) => {
-  try {
-    if (req.query.course) {
-      //convert query string value to integer and store it in course variable
-      var course = parseInt(req.query.course);
-      //Get students with matching course id by calling getStudentsByCourse from collegeData.
-      var students = await collegeData.getStudentsByCourse(course);
-      if (students && students.length > 0) {
-        res.json(students);
+// Assuming you have an asynchronous function that fetches student data
+app.get('/students', (req, res) => {
+  fetchStudentData()
+    .then(data => {
+      if (data.length > 0) {
+        res.render('students', { students: data });
       } else {
-        res.json({ message: noResultMessage });
+        res.render('students', { message: 'No results' });
       }
-    } else {
-      // Get all students by calling getAllStudents function from collegeData.
-      const students = await collegeData.getAllStudents();
-      if (students && students.length > 0) {
-        res.json(students);
+    })
+    .catch(error => {
+      // Handle promise rejection, rendering an error message
+      res.render('students', { message: 'Error fetching data' });
+    });
+});
+
+// Assuming you have an asynchronous function that fetches course data
+app.get('/courses', (req, res) => {
+  fetchCourseData()
+    .then(data => {
+      if (data.length > 0) {
+        res.render('courses', { courses: data });
       } else {
-        res.json({ message: noResultMessage });
+        res.render('courses', { message: 'No results' });
       }
-    }
-  } catch (err) {
-    //Check if the error is promise rejection message and then return no results message.
-    if (err === promiseRejectionMessage) {
-      res.json({ message: noResultMessage });
-    } else {
-      console.error(err);
-      res.status(500).json({ message: internalErrorMessage });
-    }
-  }
-});
-//Route for getting TAs with async support
-app.get("/tas", async (req, res) => {
-  try {
-    //Get all TAs using getTAs function from collegeData module (rejections due to empty or undefined is handld in catch block)
-    //This else block is added as a safety fallback to ensure a response in sent any situation
-    const TAs = await collegeData.getTAs();
-    if (TAs && TAs.length > 0) {
-      res.json(TAs);
-    } else {
-      res.json({ message: noResultMessage });
-    }
-  } catch (err) {
-    //Check if the error is promise rejection message and then return no results message.
-    if (err === promiseRejectionMessage) {
-      res.json({ message: noResultMessage });
-    } else {
-      console.error(err);
-      res.status(500).json({ message: internalErrorMessage });
-    }
-  }
+    })
+    .catch(error => {
+      // Handle promise rejection, rendering an error message
+      res.render('courses', { message: 'Error fetching data' });
+    });
 });
 
-//Route for getting all courses
-app.get("/courses", async (req, res) => {
-  try {
-    //Get all course using getCourses from collegeData module.
-    const courses = await collegeData.getCourses();
-    if (courses && courses.length > 0) {
-      res.json(courses);
-    } else {
-      res.json({ message: noResultMessage });
-    }
-  } catch (err) {
-    //Check if the error is promise rejection message and then return no results message.
-    if (err === promiseRejectionMessage) {
-      res.json({ message: noResultMessage });
-    } else {
-      console.error(err);
-      res.status(500).json({ message: internalErrorMessage });
-    }
-  }
+
+
+// GET route for '/courses/add'
+app.get('/courses/add', (req, res) => {
+  res.render('addCourse'); // Rendering the 'addCourse' view (which will be added later)
 });
 
-// Route for getting student for a given studentNum
-app.get("/student/:num", async (req, res) => {
-  try {
-    //read the request parameter string and store in a variable after converting it to int
-    const num = parseInt(req.params.num);
-    //Get student for the given studentNum by calling getStudentByNum function from collegeData.
-    const matchedStudent = await collegeData.getStudentByNum(num);
-    if (matchedStudent) {
-      res.json(matchedStudent);
-    } else {
-      res.json({ message: noResultMessage });
-    }
-  } catch (err) {
-    //Check if the error is promise rejection message and then return no results message.
-    if (err === promiseRejectionMessage) {
-      res.json({ message: noResultMessage });
-    } else {
-      console.error(err);
-      res.status(500).json({ message: internalErrorMessage });
-    }
-  }
+// Route to handle adding a new course (POST request)
+app.post('/courses/add', (req, res) => {
+  const courseData = req.body; 
+
+  // Process the received course data and add it using your collegeData module
+  collegeData.addCourse(courseData)
+    .then(() => {
+      res.redirect('/courses'); // Redirect to the courses page upon successful addition
+    })
+    .catch((error) => {
+      res.status(500).send('Error adding course: ' + error); // Send error response
+    });
 });
 
-//Route for adding student to the student array
-app.post("/students/add", async (req, res) => {
-  try {
-    // Call the addStudent function with req.body as the parameter
-    const createdStudent = await collegeData.addStudent(req.body);
 
-    // Redirect to the "/students" route after successful addition
-    res.redirect("/students");
-  } catch (error) {
-    // Handle any errors here, e.g., send an error response or redirect to an error page
-    res.status(500).json({ message: "Error adding student" });
-  }
+
+// POST route for '/courses/update'
+app.post('/courses/update', (req, res) => {
+  const courseData = req.body; // Assuming course data is sent through the request body
+
+  // Call your updateCourse function with the courseData
+  updateCourse(courseData)
+    .then(() => {
+      res.redirect('/courses'); // Redirect to /courses after updating
+    })
+    .catch(error => {
+      res.status(500).send('Unable to update course'); // Handle error if update fails
+    });
 });
+
+
+app.get('/course/:id', (req, res) => {
+  const courseId = req.params.id;
+
+  // Retrieve course data by ID using collegeData module
+  collegeData.getCourseById(courseId)
+    .then((course) => {
+      if (!course) {
+        res.status(404).send('Course Not Found'); // Send 404 if no course data is found
+      } else {
+        // Render the "course" view with the retrieved course data
+        res.render('course', { course }); // Replace 'course' with your actual view name and pass course data
+      }
+    })
+    .catch((error) => {
+      res.status(500).send('Error fetching course: ' + error); // Send error response
+    });
+});
+
+// Route to handle deleting a specific course by ID
+app.get('/course/delete/:id', (req, res) => {
+  const courseId = req.params.id;
+
+  // Invoke deleteCourseById from collegeData module to delete the course by ID
+  collegeData.deleteCourseById(courseId)
+    .then(() => {
+      res.redirect('/courses'); // Redirect to the courses view upon successful deletion
+    })
+    .catch((error) => {
+      res.status(500).send('Unable to Remove Course / Course not found: ' + error); // Send error response
+    });
+});
+
+app.get('/student/delete/:studentNum', (req, res) => {
+  const studentNum = req.params.studentNum;
+
+  collegeData.deleteStudentByNum(studentNum)
+    .then(() => {
+      res.redirect('/students'); // Redirect to "/students" upon successful deletion
+    })
+    .catch(error => {
+      res.status(500).send(`Unable to Remove Student: ${error}`); // Return 500 status and error message if an issue occurs
+    });
+});
+
+
 collegeData
   .initialize()
   .then(() => {
